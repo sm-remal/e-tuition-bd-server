@@ -38,9 +38,17 @@ async function run() {
 
         // ---------- User Related API ---------- //
 
-       
+        app.post("/users", async (req, res) => {
+            const user = req.body;
 
+            const exist = await userCollection.findOne({ email: user.email });
 
+            if (exist) {
+                return res.send({ message: "user exist" });
+            }
+            const result = await userCollection.insertOne(user);
+            res.send(result);
+        });
 
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
