@@ -63,6 +63,41 @@ async function run() {
 
         // --------- Tuitions Related API ---------- //
 
+        // Admin: Get only approved tuitions (for public/tutors to view)
+        app.get("/tuitions/approved", async (req, res) => {
+            try {
+                const result = await tuitionCollection
+                    .find({ status: "Approved" })
+                    .sort({ createdAt: -1 })
+                    .toArray();
+                res.send(result);
+            } catch (error) {
+                console.error("Error fetching approved tuitions:", error);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+        // Admin: Get single tuition details by ID
+        app.get("/tuitions/details/:id", async (req, res) => {
+            try {
+                const id = req.params.id;
+                const tuition = await tuitionCollection.findOne({
+                    _id: new ObjectId(id)
+                });
+
+                if (!tuition) {
+                    return res.status(404).send({ message: "Tuition not found" });
+                }
+
+                res.send(tuition);
+            } catch (error) {
+                console.error("Error fetching tuition details:", error);
+                res.status(500).send({ message: "Server error" });
+            }
+        });
+
+
+
         // Add API to Get Tuitions
         app.get("/tuitions/:email", async (req, res) => {
             try {
