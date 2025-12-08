@@ -154,6 +154,21 @@ async function run() {
         });
 
 
+        // Delete Tuitions from Database
+        app.delete("/tuitions/:id", async (req, res) => {
+            try {
+                const id = req.params.id;
+                const result = await tuitionCollection.deleteOne({ _id: new ObjectId(id) });
+                if (result.deletedCount > 0) {
+                    res.send({ success: true, message: "Tuition deleted successfully" });
+                } else {
+                    res.status(404).send({ success: false, message: "Tuition not found" });
+                }
+            } catch (error) {
+                console.error(error);
+                res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
 
 
 
