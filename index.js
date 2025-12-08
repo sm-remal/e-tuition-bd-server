@@ -171,6 +171,37 @@ async function run() {
         });
 
 
+        // ---------- Admin Related API ---------- //
+        // Get all tuitions (for admin)
+        app.get("/admin/tuitions", async (req, res) => {
+            const result = await tuitionCollection.find().sort({ createdAt: -1 }).toArray();
+            res.send(result);
+        });
+
+
+
+        // Update tuition status (Approve/Reject)
+        app.patch("/tuitions/:id/tuitionStatus", async (req, res) => {
+            const id = req.params.id;
+            const status = req.body.status;
+
+            if (!status) {
+                return res.status(400).send({ message: "status is required" });
+            }
+
+            const query = { _id: new ObjectId(id) };
+
+            const updateInfo = {
+                $set: {
+                    status: status
+                }
+            };
+
+            const result = await tuitionCollection.updateOne(query, updateInfo);
+            res.send(result);
+        });
+
+
 
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
