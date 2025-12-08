@@ -34,10 +34,19 @@ async function run() {
         // Database Collection
         const Database = client.db("e-tuitionBD");
         const userCollection = Database.collection("users");
+        const tuitionCollection = Database.collection("tuitions");
 
 
         // ---------- User Related API ---------- //
 
+        // Check if user exists
+        app.get("/users/:email", async (req, res) => {
+            const email = req.params.email;
+            const user = await userCollection.findOne({ email });
+            res.send({ exists: !!user });
+        });
+
+        // User Create in Database
         app.post("/users", async (req, res) => {
             const user = req.body;
 
@@ -50,11 +59,85 @@ async function run() {
             res.send(result);
         });
 
+
+
+        // --------- Tuitions Related API ---------- //
+
+        // Add API to Get Tuitions
+        app.get("/tuitions/:email", async (req, res) => {
+            try {
+                const email = req.params.email;
+                const tuitions = await tuitionCollection
+                    .find({ studentEmail: email })
+                    .sort({ createdAt: -1 })
+                    .toArray();
+
+                res.send({
+                    success: true,
+                    data: tuitions
+                });
+
+            } catch (error) {
+                console.log(error);
+                res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
+
+        // Send the Tuition Info to Database by Post Method
+        app.post("/tuitions", async (req, res) => {
+            try {
+                const tuition = req.body;
+                tuition.budget = Number(tuition.budget);
+
+                // Check for existing tuition for the same student
+                const existingTuition = await tuitionCollection.findOne({
+                    studentEmail: tuition.studentEmail,
+                    subject: tuition.subject,
+                    class: tuition.class,
+                    location: tuition.location
+                });
+
+                if (existingTuition) {
+                    // If exists, increment applicationsCount
+                    const updated = await tuitionCollection.updateOne(
+                        { _id: existingTuition._id },
+                        { $inc: { applicationsCount: 1 } }
+                    );
+
+                    return res.send({
+                        success: true,
+                        message: "Tuition already exists, applicationsCount increased",
+                        data: updated
+                    });
+                } else {
+                    // If not exists, insert new
+                    tuition.createdAt = new Date();
+                    tuition.status = "Pending";
+                    tuition.applicationsCount = 1;
+
+                    const result = await tuitionCollection.insertOne(tuition);
+                    return res.send({
+                        success: true,
+                        message: "Tuition added successfully",
+                        data: result,
+                    });
+                }
+
+            } catch (error) {
+                console.log("Error adding tuition:", error);
+                return res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
+
+
+
+
+
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
-        // Ensures that the client will close when you finish/error
+
         // await client.close();
     }
 }
