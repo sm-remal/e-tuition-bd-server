@@ -130,6 +130,30 @@ async function run() {
         });
 
 
+        // Update Tuitions of Students from Database
+        app.put("/tuitions/:id", async (req, res) => {
+            try {
+                const id = req.params.id;
+                const updates = req.body;
+                if (updates.budget) updates.budget = Number(updates.budget);
+
+                const result = await tuitionCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    { $set: updates }
+                );
+
+                if (result.matchedCount > 0) {
+                    res.send({ success: true, message: "Tuition updated successfully" });
+                } else {
+                    res.status(404).send({ success: false, message: "Tuition not found" });
+                }
+            } catch (error) {
+                console.error(error);
+                res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
+
+
 
 
 
