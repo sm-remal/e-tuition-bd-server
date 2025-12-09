@@ -63,6 +63,25 @@ async function run() {
 
         // --------- Tuitions Related API ---------- //
 
+        // GET: Get latest 8 approved tuitions
+        app.get("/latest-tuitions", async (req, res) => {
+            try {
+                const result = await tuitionCollection
+                    .find({ status: "Approved" }) 
+                    .sort({ createdAt: -1 })      
+                    .limit(8)
+                    .toArray();
+
+                res.send(result);
+
+            } catch (error) {
+                console.error("Error fetching latest tuitions", error);
+                res.status(500).send({ error: "Failed to load latest tuitions" });
+            }
+        });
+
+
+
         // Admin: Get only approved tuitions (for public/tutors to view)
         app.get("/tuitions/approved", async (req, res) => {
             try {
