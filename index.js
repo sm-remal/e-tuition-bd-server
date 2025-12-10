@@ -138,6 +138,35 @@ async function run() {
             }
         });
 
+
+        // Get tutor applications by studentEmail (using query)
+        app.get("/applications/student", async (req, res) => {
+            try {
+                const email = req.query.email;
+
+                if (!email) {
+                    return res.status(400).send({
+                        success: false,
+                        message: "Email is required",
+                    });
+                }
+
+                const apps = await tutorsCollection
+                    .find({ studentEmail: email })
+                    .sort({ appliedAt: -1 })
+                    .toArray();
+
+                res.send({ success: true, data: apps });
+
+            } catch (error) {
+                console.error("Error fetching student applications:", error);
+                res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
+
+
+
+
         // Send the Tuition Info to Database by Post Method
         app.post("/tuitions", async (req, res) => {
             try {
