@@ -229,7 +229,45 @@ async function run() {
 
 
         // ----------Tutors Related API's --------- //
-        
+        // Get applications by tuitionId for Student
+        app.get("/applications/tuition/:tuitionId", async (req, res) => {
+            try {
+                const tuitionId = req.params.tuitionId;
+
+                const apps = await tutorsCollection
+                    .find({ tuitionId })
+                    .sort({ appliedAt: -1 })
+                    .toArray();
+
+                res.send({ success: true, data: apps });
+            } catch (error) {
+                console.error("Error fetching applications:", error);
+                res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
+
+        // Approve / Reject Application
+        app.patch("/applications/update-status/:id", async (req, res) => {
+            try {
+                const id = req.params.id;
+                const { status } = req.body;
+
+                if (!status) {
+                    return res.status(400).send({ message: "Status is required" });
+                }
+
+                const result = await tutorsCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    { $set: { status } }
+                );
+
+                res.send({ success: true, data: result });
+            } catch (error) {
+                console.error("Error updating status:", error);
+                res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
+
 
         //  Tutor Apply (POST)
         app.post("/applications", async (req, res) => {
