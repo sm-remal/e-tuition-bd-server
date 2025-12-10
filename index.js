@@ -35,6 +35,7 @@ async function run() {
         const Database = client.db("e-tuitionBD");
         const userCollection = Database.collection("users");
         const tuitionCollection = Database.collection("tuitions");
+        const tutorsCollection = Database.collection("tutors");
 
 
         // ---------- User Related API ---------- //
@@ -67,8 +68,8 @@ async function run() {
         app.get("/latest-tuitions", async (req, res) => {
             try {
                 const result = await tuitionCollection
-                    .find({ status: "Approved" }) 
-                    .sort({ createdAt: -1 })      
+                    .find({ status: "Approved" })
+                    .sort({ createdAt: -1 })
                     .limit(8)
                     .toArray();
 
@@ -223,6 +224,56 @@ async function run() {
                 res.status(500).send({ success: false, message: "Server error" });
             }
         });
+
+
+
+
+        // ----------Tutors Related API's --------- //
+        
+
+        //  Tutor Apply (POST)
+        app.post("/applications", async (req, res) => {
+            try {
+                const application = req.body;
+                application.status = "Pending";
+                application.appliedAt = new Date();
+
+                const result = await tutorsCollection.insertOne(application);
+                res.send({
+                    success: true,
+                    message: "Application submitted successfully",
+                    data: result
+                });
+
+            } catch (error) {
+                console.error("Error submitting application:", error);
+                res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
+
+
+        //  Get Tutor Applications (Tutor Dashboard)
+        app.get("/applications/:email", async (req, res) => {
+            try {
+                const email = req.params.email;
+
+                const applications = await tutorsCollection
+                    .find({ tutorEmail: email })
+                    .sort({ appliedAt: -1 })
+                    .toArray();
+
+                res.send({ success: true, data: applications });
+
+            } catch (error) {
+                console.error(error);
+                res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
+
+
+
+
+
 
 
         // ---------- Admin Related API ---------- //
