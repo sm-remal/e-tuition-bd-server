@@ -41,6 +41,24 @@ async function run() {
 
 
         // ---------- User Related API ---------- //
+        // GET: All Tutors (Users with role=tutor)
+        app.get("/users/role/tutor", async (req, res) => {
+            try {
+                const tutors = await userCollection
+                    .find({ role: "tutor" })
+                    .sort({ createdAt: -1 })
+                    .toArray();
+
+                res.send({
+                    success: true,
+                    data: tutors
+                });
+            } catch (error) {
+                console.error("Error fetching tutors:", error);
+                res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
+
 
         // Check if user exists
         app.get("/users/:email", async (req, res) => {
@@ -427,10 +445,50 @@ async function run() {
                 res.status(500).send({ success: false, message: "Server error" });
             }
         });
+        
+
+        // Update Application (expectedSalary)
+        app.put("/applications/update/:id", async (req, res) => {
+            try {
+                const id = req.params.id;
+                const { expectedSalary } = req.body;
+
+                const result = await tutorsCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    { $set: { expectedSalary } }
+                );
+
+                res.send({
+                    success: true,
+                    message: "Application updated successfully",
+                    data: result
+                });
+
+            } catch (error) {
+                console.error("Update error:", error);
+                res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
 
 
+        // DELETE Application
+        app.delete("/applications/delete/:id", async (req, res) => {
+            try {
+                const id = req.params.id;
 
+                const result = await tutorsCollection.deleteOne({ _id: new ObjectId(id) });
 
+                res.send({
+                    success: true,
+                    message: "Application deleted successfully",
+                    data: result
+                });
+
+            } catch (error) {
+                console.error("Delete error:", error);
+                res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
 
 
 
@@ -528,12 +586,12 @@ async function run() {
                     cancel_url: `${process.env.SITE_DOMAIN}/dashboard/apply-tutors?payment=cancelled`,
                 });
 
-                
+
 
                 res.send({ success: true, url: session.url });
 
             } catch (error) {
-                
+
 
                 res.status(500).send({
                     success: false,
