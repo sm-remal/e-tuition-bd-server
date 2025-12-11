@@ -626,6 +626,65 @@ async function run() {
         });
 
 
+        // ---------- Reports & Analytics (Admin) ---------- //
+
+        // GET: Admin analytics and reports
+        app.get("/admin/reports", async (req, res) => {
+            try {
+                // Get all successful payments
+                const allPayments = await paymentCollection
+                    .find({ paymentStatus: "paid" })
+                    .sort({ paidAt: -1 })
+                    .toArray();
+
+                // Calculate total earnings
+                const totalEarningsBDT = allPayments.reduce((sum, payment) => sum + payment.amountBDT, 0);
+                const totalEarningsUSD = allPayments.reduce((sum, payment) => sum + payment.amountUSD, 0);
+
+                // Get monthly earnings (last 6 months)
+                const monthlyData = {};
+                allPayments.forEach(payment => {
+                    const month = new Date(payment.paidAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                    if (!monthlyData[month]) {
+                        monthlyData[month] = 0;
+                    }
+                    monthlyData[month] += payment.amountBDT;
+                });
+
+                // Get today's earnings
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const todayEarnings = allPayments
+                    .filter(p => new Date(p.paidAt) >= today)
+                    .reduce((sum, p) => sum + p.amountBDT, 0);
+
+                // Get this month's earnings
+                const thisMonth = new Date();
+                thisMonth.setDate(1);
+                thisMonth.setHours(0, 0, 0, 0);
+                const monthEarnings = allPayments
+                    .filter(p => new Date(p.paidAt) >= thisMonth)
+                    .reduce((sum, p) => sum + p.amountBDT, 0);
+
+                res.send({
+                    success: true,
+                    data: {
+                        totalEarningsBDT,
+                        totalEarningsUSD,
+                        totalTransactions: allPayments.length,
+                        todayEarnings,
+                        monthEarnings,
+                        monthlyData,
+                        recentTransactions: allPayments.slice(0, 10), // Last 10 transactions
+                        allTransactions: allPayments
+                    }
+                });
+
+            } catch (error) {
+                console.error("Error fetching reports:", error);
+                res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
 
 
 
