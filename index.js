@@ -383,11 +383,11 @@ async function run() {
         app.post("/create-checkout-session", async (req, res) => {
             try {
                 console.log("=== CREATE CHECKOUT SESSION ===");
-                const { applicationId, salary, studentEmail, tutorName } = req.body;
+                const { applicationId, salary, studentEmail, tutorName, tutorImage } = req.body;
 
                 console.log("Request Body:", { applicationId, salary, studentEmail, tutorName });
 
-                if (!applicationId || !salary || !studentEmail || !tutorName) {
+                if (!applicationId || !salary || !studentEmail || !tutorName || !tutorImage) {
                     console.log(" Missing fields");
                     return res.status(400).send({
                         success: false,
@@ -431,6 +431,7 @@ async function run() {
                         applicationId: applicationId.toString(),
                         studentEmail,
                         tutorName,
+                        tutorImage,
                         originalAmountBDT: bdtAmount.toString()
                     },
                     
@@ -480,7 +481,7 @@ async function run() {
                 }
 
                 if (session.payment_status === "paid") {
-                    const { applicationId, studentEmail, tutorName, originalAmountBDT } = session.metadata;
+                    const { applicationId, studentEmail, tutorName, tutorImage, originalAmountBDT } = session.metadata;
 
                     console.log(" Payment confirmed for application:", applicationId);
 
@@ -514,6 +515,7 @@ async function run() {
                         tutorName,
                         applicationId,
                         transactionId,
+                        tutorImage,
                         paymentStatus: session.payment_status,
                         paidAt: new Date(),
                     };
