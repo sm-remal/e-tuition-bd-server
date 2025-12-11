@@ -62,6 +62,66 @@ async function run() {
             res.send(result);
         });
 
+        // Update User Profile
+        app.put("/users/:email", async (req, res) => {
+            try {
+                const email = req.params.email;
+                const { name, photoURL, phone, address, district, bio } = req.body;
+
+                // Required fields
+                if (!name || !photoURL || !phone) {
+                    return res.status(400).send({
+                        success: false,
+                        message: "Name, photoURL and phone are required."
+                    });
+                }
+
+                // Phone validation (Bangladesh)
+                if (!/^01[3-9]\d{8}$/.test(phone)) {
+                    return res.status(400).send({
+                        success: false,
+                        message: "Invalid phone number format (BD only)."
+                    });
+                }
+
+                // Build update object
+                const updateData = {
+                    name,
+                    photoURL,
+                    phone,
+                    updatedAt: new Date()
+                };
+
+                if (address) updateData.address = address;
+                if (district) updateData.district = district;
+                if (bio) updateData.bio = bio;
+
+                const result = await userCollection.updateOne(
+                    { email: email },
+                    { $set: updateData }
+                );
+
+                if (result.matchedCount === 0) {
+                    return res.status(404).send({
+                        success: false,
+                        message: "User not found"
+                    });
+                }
+
+                return res.send({
+                    success: true,
+                    message: "Profile updated successfully"
+                });
+
+            } catch (error) {
+                console.error("Error updating user:", error);
+                return res.status(500).send({
+                    success: false,
+                    message: "Server error: " + error.message
+                });
+            }
+        });
+
 
 
         // --------- Tuitions Related API ---------- //
@@ -434,7 +494,7 @@ async function run() {
                         tutorImage,
                         originalAmountBDT: bdtAmount.toString()
                     },
-                    
+
                     success_url: `http://localhost:3000/payment-success?session_id={CHECKOUT_SESSION_ID}`,
                     cancel_url: `${process.env.SITE_DOMAIN}/dashboard/apply-tutors?payment=cancelled`,
                 });
