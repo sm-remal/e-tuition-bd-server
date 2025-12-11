@@ -445,7 +445,7 @@ async function run() {
                 res.status(500).send({ success: false, message: "Server error" });
             }
         });
-        
+
 
         // Update Application (expectedSalary)
         app.put("/applications/update/:id", async (req, res) => {
@@ -492,7 +492,146 @@ async function run() {
 
 
 
-        // ---------- Admin Related API ---------- //
+        // ---------- Admin Related API (Admin) ---------- //
+
+        // GET: All users with optional search and filter
+        app.get("/admin/users", async (req, res) => {
+            try {
+                const { search, role } = req.query;
+                let query = {};
+
+                // Search by name or email
+                if (search) {
+                    query.$or = [
+                        { name: { $regex: search, $options: "i" } },
+                        { email: { $regex: search, $options: "i" } }
+                    ];
+                }
+
+                // Filter by role
+                if (role && role !== "all") {
+                    query.role = role;
+                }
+
+                const users = await userCollection
+                    .find(query)
+                    .sort({ createdAt: -1 })
+                    .toArray();
+
+                res.send({
+                    success: true,
+                    data: users
+                });
+
+            } catch (error) {
+                console.error("Error fetching users:", error);
+                res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
+
+        // PATCH: Update user information
+        app.patch("/admin/users/:id", async (req, res) => {
+            try {
+                const id = req.params.id;
+                const { name, phone, photoURL } = req.body;
+
+                const updateData = {};
+                if (name) updateData.name = name;
+                if (phone) updateData.phone = phone;
+                if (photoURL) updateData.photoURL = photoURL;
+                updateData.updatedAt = new Date();
+
+                const result = await userCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    { $set: updateData }
+                );
+
+                if (result.matchedCount === 0) {
+                    return res.status(404).send({
+                        success: false,
+                        message: "User not found"
+                    });
+                }
+
+                res.send({
+                    success: true,
+                    message: "User updated successfully"
+                });
+
+            } catch (error) {
+                console.error("Error updating user:", error);
+                res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
+
+        // PATCH: Change user role
+        app.patch("/admin/users/:id/role", async (req, res) => {
+            try {
+                const id = req.params.id;
+                const { role } = req.body;
+
+                if (!["student", "tutor", "admin"].includes(role)) {
+                    return res.status(400).send({
+                        success: false,
+                        message: "Invalid role"
+                    });
+                }
+
+                const result = await userCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    { $set: { role, updatedAt: new Date() } }
+                );
+
+                if (result.matchedCount === 0) {
+                    return res.status(404).send({
+                        success: false,
+                        message: "User not found"
+                    });
+                }
+
+                res.send({
+                    success: true,
+                    message: "User role updated successfully"
+                });
+
+            } catch (error) {
+                console.error("Error updating user role:", error);
+                res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
+
+        // DELETE: Delete user
+        app.delete("/admin/users/:id", async (req, res) => {
+            try {
+                const id = req.params.id;
+
+                const result = await userCollection.deleteOne({ _id: new ObjectId(id) });
+
+                if (result.deletedCount === 0) {
+                    return res.status(404).send({
+                        success: false,
+                        message: "User not found"
+                    });
+                }
+
+                res.send({
+                    success: true,
+                    message: "User deleted successfully"
+                });
+
+            } catch (error) {
+                console.error("Error deleting user:", error);
+                res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
+
+
+
+
+
+
+
+
         // Get all tuitions (for admin)
         app.get("/admin/tuitions", async (req, res) => {
             const result = await tuitionCollection.find().sort({ createdAt: -1 }).toArray();
