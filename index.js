@@ -2,6 +2,7 @@ const express = require('express')
 const cors = require('cors');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
+const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -36,6 +37,7 @@ async function run() {
         const userCollection = Database.collection("users");
         const tuitionCollection = Database.collection("tuitions");
         const tutorsCollection = Database.collection("tutors");
+        const paymentCollection = Database.collection("payments");
 
 
         // ---------- User Related API ---------- //
@@ -375,6 +377,184 @@ async function run() {
 
 
 
+        // =============== Payment Related API ============= //
+
+        // ---------- Part One: Creating a Checkout Session ----------
+        app.post("/create-checkout-session", async (req, res) => {
+            try {
+                console.log("=== CREATE CHECKOUT SESSION ===");
+                const { applicationId, salary, studentEmail, tutorName } = req.body;
+
+                console.log("Request Body:", { applicationId, salary, studentEmail, tutorName });
+
+                if (!applicationId || !salary || !studentEmail || !tutorName) {
+                    console.log(" Missing fields");
+                    return res.status(400).send({
+                        success: false,
+                        message: "Missing required fields"
+                    });
+                }
+
+                const bdtAmount = parseInt(salary);
+                const usdAmount = Math.ceil(bdtAmount / 120);
+                const amountInCents = usdAmount * 100;
+
+                console.log(` Converting ৳${bdtAmount} BDT → $${usdAmount} USD (${amountInCents} cents)`);
+
+                if (amountInCents < 50) {
+                    console.log(" Amount too small");
+                    return res.status(400).send({
+                        success: false,
+                        message: `Minimum payment amount is ৳60 ($0.50). Current: ৳${bdtAmount}`
+                    });
+                }
+
+                console.log(" Creating Stripe session...");
+
+                const session = await stripe.checkout.sessions.create({
+                    line_items: [
+                        {
+                            price_data: {
+                                currency: "usd",
+                                unit_amount: amountInCents,
+                                product_data: {
+                                    name: `Tuition Payment for ${tutorName}`,
+                                    description: `Original amount: ৳${bdtAmount} BDT`,
+                                },
+                            },
+                            quantity: 1,
+                        },
+                    ],
+                    customer_email: studentEmail,
+                    mode: "payment",
+                    metadata: {
+                        applicationId: applicationId.toString(),
+                        studentEmail,
+                        tutorName,
+                        originalAmountBDT: bdtAmount.toString()
+                    },
+                    
+                    success_url: `http://localhost:3000/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+                    cancel_url: `${process.env.SITE_DOMAIN}/dashboard/apply-tutors?payment=cancelled`,
+                });
+
+                console.log(" Stripe session created successfully!");
+                console.log("  - Session ID:", session.id);
+                console.log("  - Success URL:", session.url);
+
+                res.send({ success: true, url: session.url });
+
+            } catch (error) {
+                console.error(" Error creating checkout session:");
+                console.error("  - Type:", error.type);
+                console.error("  - Message:", error.message);
+
+                res.status(500).send({
+                    success: false,
+                    message: error.message
+                });
+            }
+        });
+
+        // ---------- Part Two: Payment Success - Database Update ----------
+        app.get("/payment-success", async (req, res) => {
+            try {
+                const sessionId = req.query.session_id;
+
+                if (!sessionId) {
+                    console.log(" No session ID provided");
+                    return res.redirect(`${process.env.SITE_DOMAIN}/dashboard/apply-tutors?payment=error`);
+                }
+
+                console.log(" Verifying payment for session:", sessionId);
+
+                // Retrieve Stripe session
+                const session = await stripe.checkout.sessions.retrieve(sessionId);
+                const transactionId = session.payment_intent;
+
+                // Check if payment already processed
+                const paymentExist = await paymentCollection.findOne({ transactionId });
+                if (paymentExist) {
+                    console.log(" Payment already processed:", transactionId);
+                    return res.redirect(`${process.env.SITE_DOMAIN}/dashboard/payment-success?success=true&txn=${transactionId}`);
+                }
+
+                if (session.payment_status === "paid") {
+                    const { applicationId, studentEmail, tutorName, originalAmountBDT } = session.metadata;
+
+                    console.log(" Payment confirmed for application:", applicationId);
+
+                    //  Update application status to Approved
+                    await tutorsCollection.updateOne(
+                        { _id: new ObjectId(applicationId) },
+                        { $set: { status: "Approved", paidAt: new Date() } }
+                    );
+
+                    //  Reject other pending applications for same tuition
+                    const appData = await tutorsCollection.findOne({ _id: new ObjectId(applicationId) });
+
+                    if (appData) {
+                        await tutorsCollection.updateMany(
+                            {
+                                tuitionId: appData.tuitionId,
+                                _id: { $ne: new ObjectId(applicationId) },
+                                status: "Pending"
+                            },
+                            { $set: { status: "Rejected" } }
+                        );
+                        console.log(" Other applications rejected for tuition:", appData.tuitionId);
+                    }
+
+                    //  Save payment info to database
+                    const payment = {
+                        amountBDT: parseInt(originalAmountBDT),
+                        amountUSD: session.amount_total / 100,
+                        currency: session.currency.toUpperCase(),
+                        studentEmail,
+                        tutorName,
+                        applicationId,
+                        transactionId,
+                        paymentStatus: session.payment_status,
+                        paidAt: new Date(),
+                    };
+
+                    await paymentCollection.insertOne(payment);
+                    console.log(" Payment saved to database:", transactionId);
+
+                    // Redirect to success page
+                    return res.redirect(`${process.env.SITE_DOMAIN}/dashboard/payment-success?success=true&txn=${transactionId}`);
+                } else {
+                    console.log(" Payment not completed:", session.payment_status);
+                    return res.redirect(`${process.env.SITE_DOMAIN}/dashboard/apply-tutors?payment=failed`);
+                }
+            } catch (error) {
+                console.error(" Error processing payment:", error);
+                return res.redirect(`${process.env.SITE_DOMAIN}/dashboard/apply-tutors?payment=error`);
+            }
+        });
+
+        // ---------- Payment History ----------
+        app.get("/payments", async (req, res) => {
+            try {
+                const email = req.query.email;
+                const query = {};
+
+                if (email) query.studentEmail = email;
+
+                const cursor = paymentCollection.find(query).sort({ paidAt: -1 });
+                const result = await cursor.toArray();
+                res.send(result);
+            } catch (error) {
+                console.error("Error fetching payment history:", error);
+                res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
+
+
+
+
+
+
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
@@ -390,4 +570,3 @@ run().catch(console.dir);
 app.listen(port, () => {
     console.log(`e-tuitionBD listening on port ${port}`)
 })
-
