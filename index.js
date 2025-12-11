@@ -337,6 +337,35 @@ async function run() {
             }
         });
 
+
+        // GET: Ongoing Tuitions for a tutor
+        app.get("/ongoing-tuitions/:email", async (req, res) => {
+            try {
+                const email = req.params.email;
+
+                const ongoing = await tutorsCollection
+                    .find({
+                        tutorEmail: email,
+                        status: "Approved"
+                    })
+                    .sort({ paidAt: -1 })  // Latest approved first
+                    .toArray();
+
+                res.send({
+                    success: true,
+                    data: ongoing
+                });
+
+            } catch (error) {
+                console.error("Error fetching ongoing tuitions:", error);
+                res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
+
+
+
+
+
         // Approve / Reject Application
         app.patch("/applications/update-status/:id", async (req, res) => {
             try {
@@ -499,16 +528,12 @@ async function run() {
                     cancel_url: `${process.env.SITE_DOMAIN}/dashboard/apply-tutors?payment=cancelled`,
                 });
 
-                console.log(" Stripe session created successfully!");
-                console.log("  - Session ID:", session.id);
-                console.log("  - Success URL:", session.url);
+                
 
                 res.send({ success: true, url: session.url });
 
             } catch (error) {
-                console.error(" Error creating checkout session:");
-                console.error("  - Type:", error.type);
-                console.error("  - Message:", error.message);
+                
 
                 res.status(500).send({
                     success: false,
