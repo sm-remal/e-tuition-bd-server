@@ -59,6 +59,32 @@ async function run() {
             }
         });
 
+        // GET: User details by email (full info including role for Dashboard)
+        app.get("/users/details/:email", async (req, res) => {
+            try {
+                const email = req.params.email;
+                const user = await userCollection.findOne({ email });
+
+                if (!user) {
+                    return res.status(404).send({
+                        success: false,
+                        message: "User not found"
+                    });
+                }
+
+                res.send({
+                    success: true,
+                    ...user
+                });
+            } catch (error) {
+                console.error("Error fetching user details:", error);
+                res.status(500).send({
+                    success: false,
+                    message: "Server error"
+                });
+            }
+        });
+
 
         // Check if user exists
         app.get("/users/:email", async (req, res) => {
