@@ -41,6 +41,15 @@ async function run() {
 
 
         // ---------- User Related API ---------- //
+
+        // Check if user exists
+        app.get("/users/:email", async (req, res) => {
+            const email = req.params.email;
+            const user = await userCollection.findOne({ email });
+            res.send(user);
+        });
+
+
         // GET: All Tutors (Users with role=tutor)
         app.get("/users/role/tutor", async (req, res) => {
             try {
@@ -85,13 +94,6 @@ async function run() {
             }
         });
 
-
-        // Check if user exists
-        app.get("/users/:email", async (req, res) => {
-            const email = req.params.email;
-            const user = await userCollection.findOne({ email });
-            res.send({ exists: !!user });
-        });
 
         // User Create in Database
         app.post("/users", async (req, res) => {
