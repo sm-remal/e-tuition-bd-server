@@ -68,6 +68,27 @@ async function run() {
             }
         });
 
+
+        // GET: Latest 6 Tutors (Users with role=tutor)
+        app.get("/users/role/latest-tutor", async (req, res) => {
+            try {
+                const tutors = await userCollection
+                    .find({ role: "tutor" })
+                    .sort({ createdAt: -1 }) 
+                    .limit(6)               
+                    .toArray();
+
+                res.send({
+                    success: true,
+                    data: tutors
+                });
+            } catch (error) {
+                console.error("Error fetching tutors:", error);
+                res.status(500).send({ success: false, message: "Server error" });
+            }
+        });
+
+
         // GET: User details by email (full info including role for Dashboard)
         app.get("/users/details/:email", async (req, res) => {
             try {
