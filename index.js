@@ -7,9 +7,38 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET);
 const app = express();
 const port = process.env.PORT || 3000;
 
+const admin = require("firebase-admin");
+const serviceAccount = require("./e-tuition-bd-firebase-adminsdk.json");
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+});
+
+
 
 app.use(cors());
 app.use(express.json());
+
+
+// ======== MiddleWare for Verification ======== //
+const verifyFirebaseToken = async (req, res, next) => {
+    console.log("Firebase-Token: ", req.headers.authorization);
+    if (!req.headers.authorization) {
+        return res.status(401).send({ message: "unauthorized access" })
+    }
+    const token = req.headers.authorization.split(" ")[1];
+    if (!token) {
+        return res.status(401).send({ message: "unauthorized access" })
+    }
+    try {
+        const userInfo = await admin.auth().verifyIdToken(token);
+        req.token_email = userInfo.email;
+        console.log("userInfo: ", userInfo)
+        next();
+    }
+    catch {
+        return res.status(401).send({ message: 'unauthorized access' })
+    }
+}
 
 
 app.get('/', (req, res) => {
@@ -38,6 +67,21 @@ async function run() {
         const tuitionCollection = Database.collection("tuitions");
         const tutorsCollection = Database.collection("tutors");
         const paymentCollection = Database.collection("payments");
+
+        // ========== Middle-Ware with Database Access ========== //
+       
+
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.token_email;
+            const query = { email };
+            const user = await userCollection.findOne(query);
+
+            if (!user || user.role !== "admin") {
+                return res.status(403).send({ message: "Forbidden Access" });
+            }
+
+            next()
+        }
 
 
         // ---------- User Related API ---------- //
@@ -74,8 +118,8 @@ async function run() {
             try {
                 const tutors = await userCollection
                     .find({ role: "tutor" })
-                    .sort({ createdAt: -1 }) 
-                    .limit(6)               
+                    .sort({ createdAt: -1 })
+                    .limit(6)
                     .toArray();
 
                 res.send({
@@ -269,7 +313,7 @@ async function run() {
 
 
         // Get tutor applications by studentEmail (using query)
-        app.get("/applications/student", async (req, res) => {
+        app.get("/applications/student", verifyFirebaseToken, async (req, res) => {
             try {
                 const email = req.query.email;
 
@@ -406,7 +450,7 @@ async function run() {
 
 
         // GET: Ongoing Tuitions for a tutor
-        app.get("/ongoing-tuitions/:email", async (req, res) => {
+        app.get("/ongoing-tuitions/:email", verifyFirebaseToken, async (req, res) => {
             try {
                 const email = req.params.email;
 
@@ -415,7 +459,7 @@ async function run() {
                         tutorEmail: email,
                         status: "Approved"
                     })
-                    .sort({ paidAt: -1 })  // Latest approved first
+                    .sort({ paidAt: -1 })  
                     .toArray();
 
                 res.send({
@@ -478,7 +522,7 @@ async function run() {
 
 
         //  Get Tutor Applications (Tutor Dashboard)
-        app.get("/applications/:email", async (req, res) => {
+        app.get("/applications/:email", verifyFirebaseToken, async (req, res) => {
             try {
                 const email = req.params.email;
 
@@ -544,7 +588,7 @@ async function run() {
         // ---------- Admin Related API (Admin) ---------- //
 
         // GET: All users with optional search and filter
-        app.get("/admin/users", async (req, res) => {
+        app.get("/admin/users", verifyFirebaseToken, verifyAdmin, async (req, res) => {
             try {
                 const { search, role } = req.query;
                 let query = {};
@@ -579,7 +623,7 @@ async function run() {
         });
 
         // PATCH: Update user information
-        app.patch("/admin/users/:id", async (req, res) => {
+        app.patch("/admin/users/:id", verifyFirebaseToken, verifyAdmin, async (req, res) => {
             try {
                 const id = req.params.id;
                 const { name, phone, photoURL } = req.body;
@@ -614,7 +658,7 @@ async function run() {
         });
 
         // PATCH: Change user role
-        app.patch("/admin/users/:id/role", async (req, res) => {
+        app.patch("/admin/users/:id/role", verifyFirebaseToken, verifyAdmin, async (req, res) => {
             try {
                 const id = req.params.id;
                 const { role } = req.body;
@@ -650,7 +694,7 @@ async function run() {
         });
 
         // DELETE: Delete user
-        app.delete("/admin/users/:id", async (req, res) => {
+        app.delete("/admin/users/:id", verifyFirebaseToken, verifyAdmin, async (req, res) => {
             try {
                 const id = req.params.id;
 
@@ -678,7 +722,7 @@ async function run() {
         // ---------- Reports & Analytics (Admin) ---------- //
 
         // GET: Admin analytics and reports
-        app.get("/admin/reports", async (req, res) => {
+        app.get("/admin/reports", verifyFirebaseToken, verifyAdmin, async (req, res) => {
             try {
                 // Get all successful payments
                 const allPayments = await paymentCollection
@@ -741,7 +785,7 @@ async function run() {
 
 
         // Get all tuitions (for admin)
-        app.get("/admin/tuitions", async (req, res) => {
+        app.get("/admin/tuitions", verifyFirebaseToken, verifyAdmin, async (req, res) => {
             const result = await tuitionCollection.find().sort({ createdAt: -1 }).toArray();
             res.send(result);
         });
@@ -749,7 +793,7 @@ async function run() {
 
 
         // Update tuition status (Approve/Reject)
-        app.patch("/tuitions/:id/tuitionStatus", async (req, res) => {
+        app.patch("/tuitions/:id/tuitionStatus", verifyFirebaseToken, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const status = req.body.status;
 
@@ -926,7 +970,7 @@ async function run() {
         });
 
         // ---------- Payment History ----------
-        app.get("/payments", async (req, res) => {
+        app.get("/payments", verifyFirebaseToken, async (req, res) => {
             try {
                 const email = req.query.email;
                 const query = {};
