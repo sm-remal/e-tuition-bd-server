@@ -69,8 +69,9 @@ async function run() {
         const paymentCollection = Database.collection("payments");
 
         // ========== Middle-Ware with Database Access ========== //
-       
 
+
+        // ===== Admin Verification Middleware =====
         const verifyAdmin = async (req, res, next) => {
             const email = req.token_email;
             const query = { email };
@@ -119,7 +120,7 @@ async function run() {
                 const tutors = await userCollection
                     .find({ role: "tutor" })
                     .sort({ createdAt: -1 })
-                    .limit(6)
+                    .limit(8)
                     .toArray();
 
                 res.send({
@@ -459,7 +460,7 @@ async function run() {
                         tutorEmail: email,
                         status: "Approved"
                     })
-                    .sort({ paidAt: -1 })  
+                    .sort({ paidAt: -1 })
                     .toArray();
 
                 res.send({
@@ -472,9 +473,6 @@ async function run() {
                 res.status(500).send({ success: false, message: "Server error" });
             }
         });
-
-
-
 
 
         // Approve / Reject Application
@@ -970,7 +968,7 @@ async function run() {
         });
 
         // ---------- Payment History ----------
-        app.get("/payments", verifyFirebaseToken, async (req, res) => {
+        app.get("/payments", async (req, res) => {
             try {
                 const email = req.query.email;
                 const query = {};
