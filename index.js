@@ -72,12 +72,36 @@ async function run() {
 
 
         // ===== Admin Verification Middleware =====
-        const verifyAdmin = async (req, res, next) => {
+        const verifyAdmin = async (req, res, next) => { 
             const email = req.token_email;
             const query = { email };
             const user = await userCollection.findOne(query);
 
             if (!user || user.role !== "admin") {
+                return res.status(403).send({ message: "Forbidden Access" });
+            }
+
+            next()
+        }
+
+        const verifyTutor = async (req, res, next) => {
+            const email = req.token_email;
+            const query = { email };
+            const user = await userCollection.findOne(query);
+
+            if (!user || user.role !== "tutor") {
+                return res.status(403).send({ message: "Forbidden Access" });
+            }
+
+            next()
+        }
+
+        const verifyStudent = async (req, res, next) => {
+            const email = req.token_email;
+            const query = { email };
+            const user = await userCollection.findOne(query);
+
+            if (!user || user.role !== "student") {
                 return res.status(403).send({ message: "Forbidden Access" });
             }
 
@@ -293,7 +317,7 @@ async function run() {
 
 
         // Add API to Get Tuitions
-        app.get("/tuitions/:email", async (req, res) => {
+        app.get("/tuitions/:email", verifyFirebaseToken, verifyStudent, async (req, res) => {
             try {
                 const email = req.params.email;
                 const tuitions = await tuitionCollection
@@ -314,7 +338,7 @@ async function run() {
 
 
         // Get tutor applications by studentEmail (using query)
-        app.get("/applications/student", verifyFirebaseToken, async (req, res) => {
+        app.get("/applications/student", verifyFirebaseToken, verifyStudent, async (req, res) => {
             try {
                 const email = req.query.email;
 
@@ -342,7 +366,7 @@ async function run() {
 
 
         // Send the Tuition Info to Database by Post Method
-        app.post("/tuitions", async (req, res) => {
+        app.post("/tuitions", verifyFirebaseToken, verifyStudent, async (req, res) => {
             try {
                 const tuition = req.body;
                 tuition.budget = Number(tuition.budget);
@@ -389,7 +413,7 @@ async function run() {
 
 
         // Update Tuitions of Students from Database
-        app.put("/tuitions/:id", async (req, res) => {
+        app.put("/tuitions/:id", verifyFirebaseToken, verifyStudent, async (req, res) => {
             try {
                 const id = req.params.id;
                 const updates = req.body;
@@ -413,7 +437,7 @@ async function run() {
 
 
         // Delete Tuitions from Database
-        app.delete("/tuitions/:id", async (req, res) => {
+        app.delete("/tuitions/:id", verifyFirebaseToken, verifyStudent, async (req, res) => {
             try {
                 const id = req.params.id;
                 const result = await tuitionCollection.deleteOne({ _id: new ObjectId(id) });
@@ -451,7 +475,7 @@ async function run() {
 
 
         // GET: Ongoing Tuitions for a tutor
-        app.get("/ongoing-tuitions/:email", verifyFirebaseToken, async (req, res) => {
+        app.get("/ongoing-tuitions/:email", verifyFirebaseToken, verifyTutor, async (req, res) => {
             try {
                 const email = req.params.email;
 
@@ -476,7 +500,7 @@ async function run() {
 
 
         // Approve / Reject Application
-        app.patch("/applications/update-status/:id", async (req, res) => {
+        app.patch("/applications/update-status/:id", verifyFirebaseToken, verifyStudent, async (req, res) => {
             try {
                 const id = req.params.id;
                 const { status } = req.body;
@@ -520,7 +544,7 @@ async function run() {
 
 
         //  Get Tutor Applications (Tutor Dashboard)
-        app.get("/applications/:email", verifyFirebaseToken, async (req, res) => {
+        app.get("/applications/:email", verifyFirebaseToken, verifyTutor, async (req, res) => {
             try {
                 const email = req.params.email;
 
@@ -539,7 +563,7 @@ async function run() {
 
 
         // Update Application (expectedSalary)
-        app.put("/applications/update/:id", async (req, res) => {
+        app.put("/applications/update/:id", verifyFirebaseToken, verifyTutor, async (req, res) => {
             try {
                 const id = req.params.id;
                 const { expectedSalary } = req.body;
@@ -563,7 +587,7 @@ async function run() {
 
 
         // DELETE Application
-        app.delete("/applications/delete/:id", async (req, res) => {
+        app.delete("/applications/delete/:id", verifyFirebaseToken, verifyTutor, async (req, res) => {
             try {
                 const id = req.params.id;
 
@@ -968,7 +992,7 @@ async function run() {
         });
 
         // ---------- Payment History ----------
-        app.get("/payments", async (req, res) => {
+        app.get("/payments", verifyFirebaseToken, verifyStudent, async (req, res) => {
             try {
                 const email = req.query.email;
                 const query = {};
