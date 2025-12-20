@@ -21,7 +21,7 @@ app.use(express.json());
 
 // ======== MiddleWare for Verification ======== //
 const verifyFirebaseToken = async (req, res, next) => {
-    console.log("Firebase-Token: ", req.headers.authorization);
+    // console.log("Firebase-Token: ", req.headers.authorization);
     if (!req.headers.authorization) {
         return res.status(401).send({ message: "unauthorized access" })
     }
@@ -32,7 +32,7 @@ const verifyFirebaseToken = async (req, res, next) => {
     try {
         const userInfo = await admin.auth().verifyIdToken(token);
         req.token_email = userInfo.email;
-        console.log("userInfo: ", userInfo)
+        // console.log("userInfo: ", userInfo)
         next();
     }
     catch {
@@ -59,7 +59,7 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         // Connect the client to the server
-        await client.connect();
+        // await client.connect();
 
         // Database Collection
         const Database = client.db("e-tuitionBD");
@@ -331,7 +331,7 @@ async function run() {
                 });
 
             } catch (error) {
-                console.log(error);
+                // console.log(error);
                 res.status(500).send({ success: false, message: "Server error" });
             }
         });
@@ -406,7 +406,7 @@ async function run() {
                 }
 
             } catch (error) {
-                console.log("Error adding tuition:", error);
+                // console.log("Error adding tuition:", error);
                 return res.status(500).send({ success: false, message: "Server error" });
             }
         });
@@ -842,13 +842,13 @@ async function run() {
         // ---------- Part One: Creating a Checkout Session ----------
         app.post("/create-checkout-session", async (req, res) => {
             try {
-                console.log("=== CREATE CHECKOUT SESSION ===");
+                // console.log("=== CREATE CHECKOUT SESSION ===");
                 const { applicationId, salary, studentEmail, tutorName, tutorImage } = req.body;
 
-                console.log("Request Body:", { applicationId, salary, studentEmail, tutorName });
+                // console.log("Request Body:", { applicationId, salary, studentEmail, tutorName });
 
                 if (!applicationId || !salary || !studentEmail || !tutorName || !tutorImage) {
-                    console.log(" Missing fields");
+                    // console.log(" Missing fields");
                     return res.status(400).send({
                         success: false,
                         message: "Missing required fields"
@@ -859,17 +859,17 @@ async function run() {
                 const usdAmount = Math.ceil(bdtAmount / 120);
                 const amountInCents = usdAmount * 100;
 
-                console.log(` Converting ৳${bdtAmount} BDT → $${usdAmount} USD (${amountInCents} cents)`);
+                // console.log(` Converting ৳${bdtAmount} BDT → $${usdAmount} USD (${amountInCents} cents)`);
 
                 if (amountInCents < 50) {
-                    console.log(" Amount too small");
+                    // console.log(" Amount too small");
                     return res.status(400).send({
                         success: false,
                         message: `Minimum payment amount is ৳60 ($0.50). Current: ৳${bdtAmount}`
                     });
                 }
 
-                console.log(" Creating Stripe session...");
+                // console.log(" Creating Stripe session...");
 
                 const session = await stripe.checkout.sessions.create({
                     line_items: [
@@ -919,11 +919,11 @@ async function run() {
                 const sessionId = req.query.session_id;
 
                 if (!sessionId) {
-                    console.log(" No session ID provided");
+                    // console.log(" No session ID provided");
                     return res.redirect(`${process.env.SITE_DOMAIN}/dashboard/apply-tutors?payment=error`);
                 }
 
-                console.log(" Verifying payment for session:", sessionId);
+                // console.log(" Verifying payment for session:", sessionId);
 
                 // Retrieve Stripe session
                 const session = await stripe.checkout.sessions.retrieve(sessionId);
@@ -932,14 +932,14 @@ async function run() {
                 // Check if payment already processed
                 const paymentExist = await paymentCollection.findOne({ transactionId });
                 if (paymentExist) {
-                    console.log(" Payment already processed:", transactionId);
+                    // console.log(" Payment already processed:", transactionId);
                     return res.redirect(`${process.env.SITE_DOMAIN}/dashboard/payment-success?success=true&txn=${transactionId}`);
                 }
 
                 if (session.payment_status === "paid") {
                     const { applicationId, studentEmail, tutorName, tutorImage, originalAmountBDT } = session.metadata;
 
-                    console.log(" Payment confirmed for application:", applicationId);
+                    // console.log(" Payment confirmed for application:", applicationId);
 
                     //  Update application status to Approved
                     await tutorsCollection.updateOne(
@@ -959,7 +959,7 @@ async function run() {
                             },
                             { $set: { status: "Rejected" } }
                         );
-                        console.log(" Other applications rejected for tuition:", appData.tuitionId);
+                        // console.log(" Other applications rejected for tuition:", appData.tuitionId);
                     }
 
                     //  Save payment info to database
@@ -977,12 +977,12 @@ async function run() {
                     };
 
                     await paymentCollection.insertOne(payment);
-                    console.log(" Payment saved to database:", transactionId);
+                    // console.log(" Payment saved to database:", transactionId);
 
                     // Redirect to success page
                     return res.redirect(`${process.env.SITE_DOMAIN}/dashboard/payment-success?success=true&txn=${transactionId}`);
                 } else {
-                    console.log(" Payment not completed:", session.payment_status);
+                    // console.log(" Payment not completed:", session.payment_status);
                     return res.redirect(`${process.env.SITE_DOMAIN}/dashboard/apply-tutors?payment=failed`);
                 }
             } catch (error) {
@@ -1014,7 +1014,7 @@ async function run() {
 
 
         // Send a ping to confirm a successful connection
-        await client.db("admin").command({ ping: 1 });
+        // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
 
